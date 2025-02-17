@@ -1,0 +1,1 @@
+//no code for now but here is where the reading of posts on the screen will be done
