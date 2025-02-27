@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "LemmeCheck",
+    "name": "LetMeCheck",
     "version": "1.0.0",
     "description": "An extension that detects fake news on Facebook posts as part of my final year project.",
     "action": {
