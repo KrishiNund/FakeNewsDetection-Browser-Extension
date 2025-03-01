@@ -8,7 +8,7 @@
     },
     "permissions":[
         "scripting",
-        "tabs"
+        "activeTab"
     ],
     "host_permissions":[
         "https://www.facebook.com/*"
@@ -17,10 +17,14 @@
         "32":"icon32.png",
         "96":"icon96.png"
     },
+    "background": {
+        "service_worker": "background.js"
+    },
     "content_scripts":[
         {
             "matches":["https://www.facebook.com/*"],
-            "js":["content.js"]
+            "js":["content.js"],
+            "run_at": "document_idle"
         }
     ]
 }
