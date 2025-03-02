@@ -1,13 +1,3 @@
-function injectStyles() {
-    let style = document.createElement('link');
-    style.rel = 'stylesheet';
-    style.href = chrome.runtime.getURL('index.css');
-    document.head.appendChild(style);
-}
-
-// Inject CSS when content script runs
-injectStyles();
-
 //extracting text facebook posts currently on the screen
 let extractedPostContent = [];
 function extractTextPosts(){
@@ -16,6 +6,8 @@ function extractTextPosts(){
         //getting the text and url elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
         let urlElement = post.querySelector('div[data-ad-rendering-role="meta"]');
+        //get close button from the post
+        let closeButton = post.querySelector('a[aria-label="hide post"]');
         
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
@@ -24,19 +16,29 @@ function extractTextPosts(){
         //only add to array if text length is considerable and text is not duplicate
         if(textContent.length > 20 && !post.querySelector('.lmc-badge')){
             extractedPostContent.push({text:textContent, url:urlContent});
+
+            //create a badge that will contain the credibility assessment
             let badge = document.createElement('div');
             badge.innerText = '🔍';
-            badge.classList.add('lmc-badge');
+            badge.classList.add("lmc-badge");
 
             let tooltip = document.createElement('div');
             tooltip.innerText = `Text: ${textContent}\nURL: ${urlContent}`;
-            tooltip.classList.add('lmc-tooltip');
+            tooltip.classList.add("lmc-tooltip");
 
             badge.append(tooltip);
-            post.append(badge);
+
+            //add badge next to close button
+            if (closeButton){
+                console.log("it does exist");
+                closeButton.parentNode.insertBefore(badge, closeButton.nextSibling);
+            } else {
+                post.appendChild(badge);
+            }
         }
     });
 
+    //send the data to the background.js
     if (extractedPostContent.length > 0){
         console.log(extractedPostContent);
         chrome.runtime.sendMessage({data: extractedPostContent})
