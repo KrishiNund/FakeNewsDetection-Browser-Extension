@@ -1,13 +1,14 @@
 //extracting text facebook posts currently on the screen
 let extractedPostContent = [];
 function extractTextPosts(){
-    let posts = document.querySelectorAll('div.x1lliihq'); //[data-ad-rendering-role="meta"] div[data-ad-preview="message"]
+    let posts = document.querySelectorAll('div.x1n2onr6.x1ja2u2z'); //[data-ad-rendering-role="meta"] div[data-ad-preview="message"]
     posts.forEach(post => {
         //getting the text and url elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
         let urlElement = post.querySelector('div[data-ad-rendering-role="meta"]');
         //get close button from the post
-        let closeButton = post.querySelector('a[aria-label="hide post"]');
+        // let closeButton = post.querySelector('a[aria-label="hide post"]');
+        let menuButton = post.querySelector('div[aria-haspopup="menu"]');
         
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
@@ -29,9 +30,9 @@ function extractTextPosts(){
             badge.append(tooltip);
 
             //add badge next to close button
-            if (closeButton){
+            if (menuButton){
                 console.log("it does exist");
-                closeButton.parentNode.insertBefore(badge, closeButton.nextSibling);
+                menuButton.parentNode.insertBefore(badge, menuButton.nextSibling);
             } else {
                 post.appendChild(badge);
             }
