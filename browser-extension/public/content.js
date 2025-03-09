@@ -1,23 +1,54 @@
 //extracting text facebook posts currently on the screen
-let extractedPostContent = [];
-function extractTextPosts(){
+// let extractedPostContent = [];
+
+async function sendTextToServer(text){
+    let response = await fetch("http://127.0.0.1:5000/clean_text", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({text: text})
+    });
+
+    try{
+        let data = await response.json();
+        cleaned_text = data.cleaned_text;
+        console.log("Cleaned Text:", cleaned_text);
+        return cleaned_text;
+    } 
+    catch(err){
+        console.log("Error is: ", err);
+    }
+}
+
+async function extractTextPosts(){
+    let cleaned_text;
     //getting all post elements
     let posts = document.querySelectorAll('div.x1a2a7pz');
-    posts.forEach(post => {
+    for (let post of posts){
         //getting the text and url elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
         let urlElement = post.querySelector('div[data-ad-rendering-role="meta"]');
 
         //getting the menu button on the post (the three dots button)
-        let menuButton = post.querySelector('div[aria-haspopup="menu"]');
+        let menuButton = post.querySelector('div[aria-haspopup="menu"][aria-label="Actions for this post"]');
         
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
         let urlContent = urlElement ? urlElement.innerText.trim() : 'No URL';
 
+        //sending the extracted text to be cleaned in the server.py
+        try{
+            if (textContent !== 'No text'){
+                cleaned_text = await sendTextToServer(textContent);
+            }
+        } catch(err){
+            console.log("Error is: ", err);
+        }
+        
         //only add to array if text length is significant and the array does not already contain this text
-        if(textContent.length > 20 && !post.querySelector('.lmc-badge')){
-            extractedPostContent.push({text:textContent, url:urlContent});
+        if(cleaned_text && !post.querySelector('.lmc-badge')){
+            // extractedPostContent.push({text:cleaned_text, url:urlContent});
 
             //creating a badge that will contain the credibility assessment
             let badge = document.createElement('div');
@@ -26,7 +57,7 @@ function extractTextPosts(){
 
             //creating the tooltip that will show the assessment details on hovering the badge
             let tooltip = document.createElement('div');
-            tooltip.innerText = `Text: ${textContent}\nURL: ${urlContent}`;
+            tooltip.innerText = `Text: ${cleaned_text}\nURL: ${urlContent}`;
             tooltip.classList.add("lmc-tooltip");
 
             badge.append(tooltip);
@@ -34,19 +65,9 @@ function extractTextPosts(){
             //add badge next to menu button
             if (menuButton){
                 menuButton.parentNode.insertBefore(badge, menuButton.nextSibling);
-            } else {
-                console.log("No Menu Button");
-                // post.appendChild(badge);
             }
         }
-    });
-
-    //send the data to the background.js
-    if (extractedPostContent.length > 0){
-        console.log(extractedPostContent);
-        chrome.runtime.sendMessage({data: extractedPostContent})
     }
-    
 }
 
 //creating a Mutation observer to detect new posts as the user scrolls
