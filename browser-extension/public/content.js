@@ -12,9 +12,10 @@ async function sendTextToServer(text){
 
     try{
         let data = await response.json();
-        cleaned_text = data.cleaned_text;
-        console.log("Cleaned Text:", cleaned_text);
-        return cleaned_text;
+        label = data.label;
+        explanations = data.explanations;
+        console.log("label:", label, "explanations:", explanations);
+        return {label,explanations};
     } 
     catch(err){
         console.log("Error is: ", err);
@@ -22,7 +23,7 @@ async function sendTextToServer(text){
 }
 
 async function extractTextPosts(){
-    let cleaned_text;
+    // let cleaned_text;
     //getting all post elements
     let posts = document.querySelectorAll('div.x1a2a7pz');
     for (let post of posts){
@@ -37,17 +38,8 @@ async function extractTextPosts(){
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
         let urlContent = urlElement ? urlElement.innerText.trim() : 'No URL';
 
-        //sending the extracted text to be cleaned in the server.py
-        try{
-            if (textContent !== 'No text'){
-                cleaned_text = await sendTextToServer(textContent);
-            }
-        } catch(err){
-            console.log("Error is: ", err);
-        }
-        
-        //only add to array if text length is significant and the array does not already contain this text
-        if(cleaned_text && !post.querySelector('.lmc-badge')){
+        //add badge to post if it does not already contain one
+        if(!post.querySelector('.lmc-badge')){
             // extractedPostContent.push({text:cleaned_text, url:urlContent});
 
             //creating a badge that will contain the credibility assessment
@@ -57,7 +49,7 @@ async function extractTextPosts(){
 
             //creating the tooltip that will show the assessment details on hovering the badge
             let tooltip = document.createElement('div');
-            tooltip.innerText = `Text: ${cleaned_text}\nURL: ${urlContent}`;
+            tooltip.innerText = "Analyzing...";
             tooltip.classList.add("lmc-tooltip");
 
             badge.append(tooltip);
@@ -66,7 +58,26 @@ async function extractTextPosts(){
             if (menuButton){
                 menuButton.parentNode.insertBefore(badge, menuButton.nextSibling);
             }
+
+            //sending the extracted text to be cleaned in the server.py
+            try{
+                if (textContent !== 'No text'){
+                    let {label, explanations} = await sendTextToServer(textContent);
+                    // let label = sentiment_analysis.label;
+                    // let explanations = sentiment_analysis.explanations;
+                    tooltip.innerText = "";
+                    tooltip.innerText = `Sentiment Analysis:\nLabel:${label}\nExplanations:\n${explanations} \nURL: ${urlContent}`;
+                } else {
+                    tooltip.innerText = "";
+                    tooltip.innerText = "Classification Not Available!";
+                }
+            } catch(err){
+                console.log("Error is: ", err);
+            }
+
         }
+
+        
     }
 }
 
