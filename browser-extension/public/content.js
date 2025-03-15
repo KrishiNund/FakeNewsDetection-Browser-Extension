@@ -2,7 +2,7 @@
 // let extractedPostContent = [];
 
 async function sendTextToServer(text){
-    let response = await fetch("http://127.0.0.1:5000/clean_text", {
+    let response = await fetch("http://127.0.0.1:5000/analyse_sentiment_of_text", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -14,33 +14,68 @@ async function sendTextToServer(text){
         let data = await response.json();
         label = data.label;
         explanations = data.explanations;
-        console.log("label:", label, "explanations:", explanations);
+        // console.log("label:", label, "explanations:", explanations);
         return {label,explanations};
     } 
     catch(err){
         console.log("Error is: ", err);
+        label = "Unexpected error"
+        explanations = "Sentiment couldn't be processed!"
+        return {label, explanations};
+    }
+}
+
+async function sendHeadlineToServer(headline){
+    let response = await fetch("http://127.0.0.1:5000/detect_clickbait", {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({ headline: headline })
+    });
+    try{
+        let data = await response.json();
+        label = data.clickbait;
+        console.log("label is: ", label);
+        if (label == true){
+            return "Clickbait";
+        } else {
+            return "Not Clickbait";
+        }
+    }
+    catch(err){
+        console.log("Error is: ", err);
+        return "Unexpected error";
     }
 }
 
 async function extractTextPosts(){
-    // let cleaned_text;
     //getting all post elements
     let posts = document.querySelectorAll('div.x1a2a7pz');
     for (let post of posts){
         //getting the text and url elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
-        let urlElement = post.querySelector('div[data-ad-rendering-role="meta"]');
 
+        let article = post.querySelector('div[data-ad-rendering-role="image"]');
+        let articleHeadline;
+        // let urlElement;
+        if (article){
+            articleHeadline = post.querySelector('div.xmjcpbm.x1n2onr6.x1lku1pv span[data-ad-rendering-role="title"]');
+            // urlElement = post.querySelector('div.xmjcpbm.x1n2onr6 div[data-ad-rendering-role="image"][role="link"]');
+        } else {
+            articleHeadline = "";
+            // urlElement = "";
+        }
         //getting the menu button on the post (the three dots button)
         let menuButton = post.querySelector('div[aria-haspopup="menu"][aria-label="Actions for this post"]');
         
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
-        let urlContent = urlElement ? urlElement.innerText.trim() : 'No URL';
+        let headline = articleHeadline ? articleHeadline.innerText.trim(): 'No Headline';
+        // let urlContent = urlElement ? urlElement.href: 'No URL';
 
         //add badge to post if it does not already contain one
         if(!post.querySelector('.lmc-badge')){
-            // extractedPostContent.push({text:cleaned_text, url:urlContent});
 
             //creating a badge that will contain the credibility assessment
             let badge = document.createElement('div');
@@ -49,8 +84,13 @@ async function extractTextPosts(){
 
             //creating the tooltip that will show the assessment details on hovering the badge
             let tooltip = document.createElement('div');
-            tooltip.innerText = "Analyzing...";
             tooltip.classList.add("lmc-tooltip");
+            tooltip.innerHTML = `
+                <div class="tooltip-header">Analysing...</div>
+                <div class="tooltip-section">Please wait...</div>
+                <div class="tooltip-section">Please wait...</div>
+                <div class="tooltip-section">Please wait...</div>
+            `;
 
             badge.append(tooltip);
 
@@ -62,14 +102,36 @@ async function extractTextPosts(){
             //sending the extracted text to be cleaned in the server.py
             try{
                 if (textContent !== 'No text'){
+                    let clickbait_prediction;
                     let {label, explanations} = await sendTextToServer(textContent);
-                    // let label = sentiment_analysis.label;
-                    // let explanations = sentiment_analysis.explanations;
-                    tooltip.innerText = "";
-                    tooltip.innerText = `Sentiment Analysis:\nLabel:${label}\nExplanations:\n${explanations} \nURL: ${urlContent}`;
+                    if (headline !== 'No Headline'){
+                        clickbait_prediction = await sendHeadlineToServer(headline);
+                    } else {
+                        clickbait_prediction = "No headline available for classification!"
+                    }
+                    // tooltip.innerText = "";
+                    tooltip.innerHTML = `
+                        <div class="tooltip-header">🔍 Fake News Analysis</div>
+                        <div class="tooltip-section">
+                            <strong>🧠 AI Model Classification</strong>
+                            <p>Prediction: Likely True </p>
+                            <p>Explanations: <br>1. reason one<br> 2. reason two </p>
+                        </div>
+                        <div class="tooltip-section">
+                            <strong>📢 Clickbait Detection</strong>
+                            <p>${headline}</p>
+                            <p>Prediction: ${clickbait_prediction}</p>
+                            <p>Explanations: <br>1. reason one<br> 2. reason two</p>
+                        </div>
+                        <div class="tooltip-section">
+                            <strong>📊 Sentiment Analysis ${label}</strong>
+                            <p>Result: ${label}</p>
+                            <p>Explanations:<br>${explanations}</p>
+                        </div>
+                    `;
                 } else {
-                    tooltip.innerText = "";
-                    tooltip.innerText = "Classification Not Available!";
+                    // tooltip.innerHTML = "";
+                    tooltip.innerHTML = `<div class="tooltip-header">Classification Not Available!</div>`;
                 }
             } catch(err){
                 console.log("Error is: ", err);
@@ -77,10 +139,8 @@ async function extractTextPosts(){
 
         }
 
-        
     }
 }
-
 //creating a Mutation observer to detect new posts as the user scrolls
 const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation =>{
