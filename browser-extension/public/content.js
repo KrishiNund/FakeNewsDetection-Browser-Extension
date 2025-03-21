@@ -49,6 +49,30 @@ async function sendHeadlineToServer(headline){
     }
 }
 
+async function sendHeadlineAndTextToServer(headline, text){
+    let response = await fetch("http://127.0.0.1:5000/detect_fake_news", {
+        method: "POST",
+        headers: { 
+            "Content-Type": "application/json" 
+        },
+        body: JSON.stringify({ headline: headline, text: text})
+    });
+    try{
+        let data = await response.json();
+        label = data.fake_news;
+        console.log("label is: ", label);
+        if (label == true){
+            return "True"
+        } else {
+            return "False";
+        }
+    }
+    catch(err){
+        console.log("Error is: ", err);
+        return "Unexpected error";
+    }
+}
+
 async function extractTextPosts(){
     //getting all post elements
     let posts = document.querySelectorAll('div.x1a2a7pz');
@@ -71,7 +95,7 @@ async function extractTextPosts(){
         
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
-        let headline = articleHeadline ? articleHeadline.innerText.trim(): 'No Headline';
+        let headline = articleHeadline ? articleHeadline.innerText.trim(): "";
         // let urlContent = urlElement ? urlElement.href: 'No URL';
 
         //add badge to post if it does not already contain one
@@ -103,18 +127,26 @@ async function extractTextPosts(){
             try{
                 if (textContent !== 'No text'){
                     let clickbait_prediction;
+                    let fake_news_prediction;
+
                     let {label, explanations} = await sendTextToServer(textContent);
-                    if (headline !== 'No Headline'){
+                    if (headline !== ""){
                         clickbait_prediction = await sendHeadlineToServer(headline);
                     } else {
-                        clickbait_prediction = "No headline available for classification!"
+                        clickbait_prediction = "No headline available for classification!";
                     }
-                    // tooltip.innerText = "";
+
+                    try{
+                        fake_news_prediction = await sendHeadlineAndTextToServer(headline, textContent);
+                    } catch(err){
+                        fake_news_prediction = "No prediction available!";
+                    }
+
                     tooltip.innerHTML = `
                         <div class="tooltip-header">🔍 Fake News Analysis</div>
                         <div class="tooltip-section">
                             <strong>🧠 AI Model Classification</strong>
-                            <p>Prediction: Likely True </p>
+                            <p>Prediction: ${fake_news_prediction} </p>
                             <p>Explanations: <br>1. reason one<br> 2. reason two </p>
                         </div>
                         <div class="tooltip-section">
@@ -124,7 +156,7 @@ async function extractTextPosts(){
                             <p>Explanations: <br>1. reason one<br> 2. reason two</p>
                         </div>
                         <div class="tooltip-section">
-                            <strong>📊 Sentiment Analysis ${label}</strong>
+                            <strong>📊 Text Framing Analysis</strong>
                             <p>Result: ${label}</p>
                             <p>Explanations:<br>${explanations}</p>
                         </div>
