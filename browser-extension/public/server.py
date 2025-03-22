@@ -6,6 +6,20 @@ import joblib
 import re
 import string
 import numpy as np
+from pymongo import MongoClient
+from dotenv import load_dotenv
+import os
+
+# Load the variables from the .env file
+load_dotenv()
+
+mongodb_uri = os.getenv("MONGODB_URI")
+gpt_api_key = os.getenv("GPT_API_KEY")
+
+# Connect to MongoDB
+client = MongoClient(mongodb_uri)
+db = client["Fake_News_Detection"]
+reports_collection = db["Reports"]
 
 # Load the saved model and vectorizer
 clickbait_model = joblib.load("public/clickbait_model300d.pkl")
@@ -46,9 +60,9 @@ def preprocess_text(text):
     return text
 
 #setting up api key
-client = openai.OpenAI(api_key="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")
+client = openai.OpenAI(api_key=gpt_api_key)
 
-def analyse_sentiment(text, retries = 2):
+def analyse_language(text, retries = 2):
     try:
         response = client.chat.completions.create(
             model = "gpt-4o-mini",
@@ -74,7 +88,7 @@ def analyse_sentiment(text, retries = 2):
     except Exception as e:
         if retries > 0:
            print("Invalid JSON format, retrying...")
-           return analyse_sentiment(text, retries -1)
+           return analyse_language(text, retries -1)
         else:
             print("Error: Gpt returned invalid json multiple times.")
             return{"label": "Error", "explanations":["Unexpected Issue happened"]}
@@ -84,16 +98,33 @@ app = Flask(__name__)
 #enabling cors to allow requests from any url
 CORS(app)
 
-@app.route("/analyse_sentiment_of_text", methods=["POST"])
-def analyse_sentiment_of_text():
+@app.route("/report", methods=["POST"])
+def report():
+    data = request.json
+    if not data or "headline" not in data or "text" not in data or "prediction" not in data:
+        return jsonify({"message": "Invalid data"}), 400
+    
+    report_details = {
+        "headline": data["headline"],
+        "text": data["text"],
+        "prediction_made": data["prediction"],
+        "actual_prediction":data["actual_prediction"],
+    }
+
+    reports_collection.insert_one(report_details)
+    return jsonify({"message": "Report successful!"}), 201
+
+
+@app.route("/analyse_language_of_text", methods=["POST"])
+def analyse_language_of_text():
     try:
         data = request.get_json()
         text = data.get("text", "")
 
-        sentiment_analysis = analyse_sentiment(text)
+        language_analysis = analyse_language(text)
 
-        label = sentiment_analysis.get("label")
-        explanations = (sentiment_analysis.get("explanations"))
+        label = language_analysis.get("label")
+        explanations = (language_analysis.get("explanations"))
         
         if (label != "Error"):
             return {
@@ -103,7 +134,7 @@ def analyse_sentiment_of_text():
         else:
             return {
                 "label": "Unexpected Error",
-                "explanations": "Sentiment couldn't be processed!"
+                "explanations": "Language Analysis couldn't be performed!"
             }
 
     except Exception as e:
@@ -118,13 +149,12 @@ def detect_clickbait():
 
         # Preprocess headline
         cleaned_headline = preprocess_text(headline)
-
         # Convert text to TF-IDF features
         # transformed_text = clickbait_vectorizer.transform([cleaned_headline])
         glove_vector = sentence_to_glove_vector(cleaned_headline, word_to_vec_map)
 
         # Predict clickbait
-        prediction = clickbait_model.predict(glove_vector)[0]
+        prediction = clickbait_model.predict([glove_vector])[0]
 
         return jsonify({"clickbait": bool(prediction)})
 
