@@ -67,10 +67,10 @@ def analyse_language(text, retries = 2):
         response = client.chat.completions.create(
             model = "gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You analyze text sentiment. Respond strictly in valid JSON format."},
+                {"role": "system", "content": "You analyze the language used in text. Respond strictly in valid JSON format."},
                 {"role": "user", "content": f"""
                     Analyze the following text and return a JSON object with:
-                    - "label" (one of: "Sensational", "Emotional", "Neutral", "Sarcastic / Satirical", "Persuasive", "Propaganda")
+                    - "label" (one of: "Sensational", "Neutral")
                     - "explanations" (an array of at most 2 very short phrases explaining why)
 
                     Text: {text}
@@ -107,6 +107,7 @@ def report():
     report_details = {
         "headline": data["headline"],
         "text": data["text"],
+        "source": data["source"],
         "prediction_made": data["prediction"],
         "actual_prediction":data["actual_prediction"],
     }
