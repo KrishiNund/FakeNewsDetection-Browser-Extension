@@ -78,6 +78,9 @@ function showTooltip(event){
     }
 }
 
+let total_assessments = 0;
+let correct_assessments = 0;
+let incorrect_reported_assessments = 0;
 //perform credibility assessment on text posts 
 async function assess_credibility_of_posts(){
     //getting all post elements
@@ -86,6 +89,7 @@ async function assess_credibility_of_posts(){
         //getting the text and url elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
         let article = post.querySelector('div[data-ad-rendering-role="image"]');
+        let source = post.querySelector('div[data-ad-rendering-role="profile_name"]');
 
         let articleHeadline;
         if (article){
@@ -99,6 +103,7 @@ async function assess_credibility_of_posts(){
         //extracting the text and url from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
         let headline = articleHeadline ? articleHeadline.innerText.trim(): "";
+        let sourceContent = source ? source.innerText.trim(): "";
 
         //add badge to post if it does not already contain one
         if(!post.querySelector('.lmc-badge')){
@@ -129,6 +134,7 @@ async function assess_credibility_of_posts(){
             //sending the extracted text and headline to the server for the different detection methods
             try{
                 if (textContent !== 'No text'){
+                    total_assessments += 1;
                     const [text_analysis, clickbait_result, fake_news_result] = await Promise.all([
                         text_framing_analysis(textContent),
                         headline.trim() ? detect_clickbait(headline) : "No headline available for classification!",
@@ -137,6 +143,11 @@ async function assess_credibility_of_posts(){
                     let {label, explanations} = text_analysis;
                     let clickbait_prediction = clickbait_result;
                     let fake_news_prediction = fake_news_result;
+
+                    if (fake_news_prediction){
+                        correct_assessments += 1;
+                        updateDashboardDetails(total_assessments, correct_assessments, incorrect_reported_assessments);
+                    }
 
                     tooltip.innerHTML = `
                         <div class="tooltip-header">🔍 Fake News Analysis</div>
@@ -157,9 +168,14 @@ async function assess_credibility_of_posts(){
                             <p>Explanations:<br>${explanations}</p>
                         </div>
                     `;
-                    post.querySelector(".fake-news-report-button").addEventListener("click", () => {
-                        report_prediction(headline, textContent, fake_news_prediction);
+
+                    tooltip.querySelector(".fake-news-report-button").addEventListener("click", () => {
+                        report_prediction(headline, textContent, fake_news_prediction, sourceContent);
+                        incorrect_reported_assessments += 1;
+                        correct_assessments -= 1;
+                        updateDashboardDetails(total_assessments, correct_assessments, incorrect_reported_assessments);
                     });
+                    
                 } else {
                     tooltip.innerHTML = `<div class="tooltip-header">Classification Not Available!</div>`;
                 }
@@ -172,7 +188,15 @@ async function assess_credibility_of_posts(){
     }
 }
 
-function report_prediction(headline, text, prediction){
+function updateDashboardDetails(num_assessments, num_correct_assessments, num_incorrect_assessments){
+    chrome.storage.local.set({
+        total_assessments: num_assessments,
+        num_correct_assessments: num_correct_assessments,
+        num_incorrect_assessments: num_incorrect_assessments
+    });
+}
+
+function report_prediction(headline, text, prediction, source){
     const confirm_report = confirm("Are you sure you want to report this prediction?")
     if (confirm_report){
 
@@ -184,12 +208,15 @@ function report_prediction(headline, text, prediction){
             body: JSON.stringify({
                 headline: headline,
                 text: text,
+                source: source,
                 prediction: prediction,
                 actual_prediction: prediction === "False" ? "True" : "False",
             })
         })
         .then(response => response.json())
-        .then(data => alert(data.message))
+        .then(data => {
+            alert(data.message);
+        })
         .catch(error => console.log("Error: ", error));
     }
 }
