@@ -15,6 +15,7 @@ load_dotenv()
 
 mongodb_uri = os.getenv("MONGODB_URI")
 gpt_api_key = os.getenv("GPT_API_KEY")
+perplexity_api_key = os.getenv("PERPLEXITY_API_KEY")
 
 # connecting to MongoDB
 client = MongoClient(mongodb_uri)
@@ -59,6 +60,7 @@ def preprocess_text(text):
     text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
     return text
 
+
 #setting up api key
 client = openai.OpenAI(api_key=gpt_api_key)
 
@@ -92,7 +94,42 @@ def analyse_language(text, retries = 2):
         else:
             print("Error: Gpt returned invalid json multiple times.")
             return{"label": "Error", "explanations":["Unexpected Issue happened"]}
- 
+
+
+# using perplexity api to fact check
+clientPerplexity = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
+def fact_check_with_perplexity(text):
+    try:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a fact-checking AI. Your job is to analyze the claim provided "
+                    "and determine its credibility. You must return one of the following: "
+                    "1. 'True' (if the claim is verifiably correct), "
+                    "2. 'False' (if the claim is demonstrably incorrect), "
+                    "3. 'Unsure' (if there is not enough information to verify). "
+                    "Provide your answer as just one of these words without extra explanation."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"Fact-check this claim: {text}",
+            },
+        ]
+
+        response = clientPerplexity.chat.completions.create(
+            model="sonar",
+            messages=messages  # Use 'high', 'medium', or 'low' for cost optimization
+        )
+
+        return response.choices[0].message.content.strip()
+    
+    except Exception as e:
+        return("Error is ", e)
+
+
+
 #initializing flask
 app = Flask(__name__)
 #enabling cors to allow requests from any url
@@ -170,19 +207,32 @@ def detect_fake_news():
         headline = data.get("headline", "")
         text = data.get("text", "")
 
-        cleaned_headline = preprocess_text(headline)
-        cleaned_text = preprocess_text(text)
+        #fact check first
+        fact_check = fact_check_with_perplexity(text)
+        print(fact_check)
 
-        combined_text = cleaned_headline + ' ' + cleaned_text;
+        if (fact_check == "True"):
+            print("Preplexity prediction true!")
+            return jsonify({"fake_news": bool(1)})
+        
+        elif (fact_check == "False"):
+            print("Perplexity prediction false")
+            return jsonify({"fake_news": bool(0)})
+        
+        else:
+            cleaned_headline = preprocess_text(headline)
+            cleaned_text = preprocess_text(text)
 
-        glove_vector = sentence_to_glove_vector(combined_text, word_to_vec_map)
+            combined_text = cleaned_headline + ' ' + cleaned_text;
 
-        prediction = fake_news_model.predict([glove_vector])[0]
+            glove_vector = sentence_to_glove_vector(combined_text, word_to_vec_map)
 
-        print(prediction)
+            prediction = fake_news_model.predict([glove_vector])[0]
 
-        return jsonify({"fake_news": bool(prediction)})
+            print(prediction)
 
+            return jsonify({"fake_news": bool(prediction)})
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 400
     
