@@ -133,20 +133,6 @@ async function assess_credibility_of_posts(){
 
             //sending the extracted text and headline to the server for the different detection methods
             try{
-                let fake_news_prediction;
-                let source_checked = false;
-                //source checking
-                reputable_news_sources = ["Fox News", "BBC News", "ABC News", "Reuters", "PolitiFact", 
-                    "The New York Times", "The Guardian", "NBC News", "TIME", "Washington Post", "The Economist", 
-                    "The Wall Street Journal", "ABS-CBN News", "Vera Files", "USA TODAY", "U.S. News and World Report", 
-                    "Financial Times", "Bloomberg", "AP", "NPR", "C-SPAN"];
-                
-                if (reputable_news_sources.includes(sourceContent)){
-                    fake_news_prediction = "True";
-                    source_checked = true;
-                    console.log(fake_news_prediction, source_checked)
-                }
-
                 if (textContent !== 'No text'){
                     total_assessments += 1;
                     const [text_analysis, clickbait_result, fake_news_result] = await Promise.all([
@@ -156,10 +142,7 @@ async function assess_credibility_of_posts(){
                     ]);
                     let {label, explanations} = text_analysis;
                     let clickbait_prediction = clickbait_result;
-
-                    if (source_checked == false){
-                        fake_news_prediction = fake_news_result;
-                    }
+                    let fake_news_prediction = fake_news_result;
 
                     if (fake_news_prediction){
                         correct_assessments += 1;

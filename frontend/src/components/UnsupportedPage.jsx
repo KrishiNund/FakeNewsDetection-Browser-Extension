@@ -3,7 +3,7 @@ import {Ban} from "lucide-react";
 function UnsupportedPage(){
     return(
         <div className="flex items-center justify-center h-screen bg-gray-100">
-            <div className="bg-white p-6 shadow-md rounded-lg max-w-md text-center border border-red-300">
+            <div className="bg-white p-6 shadow-md max-w-md text-center">
                 <div className="flex items-center justify-center text-red-500">
                     <Ban className="w-8 h-8" />
                 </div>

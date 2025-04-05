@@ -24,7 +24,6 @@ reports_collection = db["Reports"]
 
 # loading the saved model and vectorizer
 clickbait_model = joblib.load("backend/clickbait_model300d.pkl")
-# clickbait_vectorizer = joblib.load("public/clickbait_vectorizer.pkl")
 
 # loading the saved fake news detection model
 fake_news_model = joblib.load("backend/fake_news_model300d.pkl")
@@ -117,14 +116,11 @@ def fact_check_with_perplexity(text):
                 "content": f"Fact-check this claim: {text}",
             },
         ]
-
         response = clientPerplexity.chat.completions.create(
             model="sonar",
-            messages=messages  # Use 'high', 'medium', or 'low' for cost optimization
+            messages=messages
         )
-
-        return response.choices[0].message.content.strip()
-    
+        return response.choices[0].message.content.strip()  
     except Exception as e:
         return("Error is ", e)
 
