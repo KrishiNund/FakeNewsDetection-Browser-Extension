@@ -97,18 +97,22 @@ def analyse_language(text, retries = 2):
 
 # using perplexity api to fact check
 clientPerplexity = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
-def fact_check_with_perplexity(text):
+def cross_verify_with_perplexity(text):
     try:
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are a fact-checking AI. Your job is to analyze the claim provided "
-                    "and determine its credibility. You must return one of the following: "
-                    "1. 'True' (if the claim is verifiably correct), "
-                    "2. 'False' (if the claim is demonstrably incorrect), "
-                    "3. 'Unsure' (if there is not enough information to verify). "
-                    "Provide your answer as just one of these words without extra explanation."
+                    """
+                        You are an AI that verifies claims by checking multiple online news sources.
+                        Your job is to search for reliable and reputable sources that report similar claims.
+
+                        - If at least one reputable source reports the same claim, return: "Likely True".
+                        - If at least one reputable source contradicts the claim, return: "Likely False".
+                        - If there is no strong evidence supporting or contradicting the claim, return: "Unverified".
+
+                        Strictly provide your answer as just one of these three words only: "Likely True", "Likely False", or "Unverified". No extra text.
+                    """
                 ),
             },
             {
@@ -118,7 +122,10 @@ def fact_check_with_perplexity(text):
         ]
         response = clientPerplexity.chat.completions.create(
             model="sonar",
-            messages=messages
+            messages=messages,
+            temperature= 0,
+            max_tokens = 3,
+            web_search_options= {"search_context_size": "low"}
         )
         return response.choices[0].message.content.strip()  
     except Exception as e:
@@ -183,8 +190,7 @@ def detect_clickbait():
 
         # Preprocess headline
         cleaned_headline = preprocess_text(headline)
-        # Convert text to TF-IDF features
-        # transformed_text = clickbait_vectorizer.transform([cleaned_headline])
+    
         glove_vector = sentence_to_glove_vector(cleaned_headline, word_to_vec_map)
 
         # Predict clickbait
@@ -204,16 +210,16 @@ def detect_fake_news():
         text = data.get("text", "")
 
         #fact check first
-        fact_check = fact_check_with_perplexity(text)
-        print(fact_check)
+        cross_verification = cross_verify_with_perplexity(text)
+        print(cross_verification)
 
-        if (fact_check == "True"):
+        if (cross_verification == "Likely True"):
             print("Preplexity prediction true!")
-            return jsonify({"fake_news": bool(1)})
+            return jsonify({"label": "Likely True"})
         
-        elif (fact_check == "False"):
+        elif (cross_verification == "Likely False"):
             print("Perplexity prediction false")
-            return jsonify({"fake_news": bool(0)})
+            return jsonify({"label": "Likely False"})
         
         else:
             cleaned_headline = preprocess_text(headline)
@@ -226,8 +232,10 @@ def detect_fake_news():
             prediction = fake_news_model.predict([glove_vector])[0]
 
             print(prediction)
-
-            return jsonify({"fake_news": bool(prediction)})
+            if (prediction == 1):
+                return jsonify({"label": "Likely True"})
+            else:
+                return jsonify({"label": "Likely False"})
         
     except Exception as e:
         return jsonify({"error": str(e)}), 400
