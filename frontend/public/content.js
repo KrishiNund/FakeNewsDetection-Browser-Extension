@@ -55,12 +55,8 @@ async function detect_fake_news(headline, text){
     });
     try{
         let data = await response.json();
-        label = data.fake_news;
-        if (label == true){
-            return "True"
-        } else {
-            return "False";
-        }
+        label = data.label;
+        return label;
     }
     catch(err){
         console.log("Error is: ", err);
@@ -150,9 +146,9 @@ async function assess_credibility_of_posts(){
                     }
 
                     tooltip.innerHTML = `
-                        <div class="tooltip-header">🔍 Fake News Analysis</div>
+                        <div class="tooltip-header">🔍 Credibility Assessment</div>
                         <div class="tooltip-section">
-                            <strong>🧠 AI Model Classification</strong>
+                            <strong>🧠 Fake News Classification</strong>
                             <div class="fake-news-section">
                                 <p>Prediction: ${fake_news_prediction}</p>
                                 <button class="fake-news-report-button">🚨</button>
