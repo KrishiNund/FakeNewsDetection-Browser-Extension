@@ -1,3 +1,4 @@
+// send extracted text to server for text framing analysis
 async function text_framing_analysis(text){
     let response = await fetch("http://127.0.0.1:5000/analyse_language_of_text", {
         method: "POST",
@@ -16,11 +17,12 @@ async function text_framing_analysis(text){
     catch(err){
         console.log("Error is: ", err);
         label = "Unexpected error"
-        explanations = "Sentiment couldn't be processed!"
+        explanations = "Analysis couldn't be performed!"
         return {label, explanations};
     }
 }
 
+// send extracted headline to server for clickbait detection
 async function detect_clickbait(headline){
     let response = await fetch("http://127.0.0.1:5000/detect_clickbait", {
         method: "POST",
@@ -32,7 +34,6 @@ async function detect_clickbait(headline){
     try{
         let data = await response.json();
         label = data.clickbait;
-        // console.log("label: ", label);
         if (label == true){
             return "Clickbait";
         } else {
@@ -45,6 +46,7 @@ async function detect_clickbait(headline){
     }
 }
 
+// send extracted headline and text to server for fake news classification
 async function detect_fake_news(headline, text){
     let response = await fetch("http://127.0.0.1:5000/detect_fake_news", {
         method: "POST",
@@ -64,7 +66,7 @@ async function detect_fake_news(headline, text){
     }
 }
 
-//display or hide tooltip upon clicking on badge
+// display or hide tooltip upon clicking on badge
 function showTooltip(event){
     let tooltip = event.currentTarget.querySelector(".lmc-tooltip");
     if (tooltip.style.display === "block"){
@@ -77,12 +79,13 @@ function showTooltip(event){
 let total_assessments = 0;
 let correct_assessments = 0;
 let incorrect_reported_assessments = 0;
+
 //perform credibility assessment on text posts 
 async function assess_credibility_of_posts(){
     //getting all post elements
     let posts = document.querySelectorAll('div.x1a2a7pz');
     for (let post of posts){
-        //getting the text and url elements from the post
+        //getting the text, article and source elements from the post
         let textElement = post.querySelector('div[data-ad-preview="message"]');
         let article = post.querySelector('div[data-ad-rendering-role="image"]');
         let source = post.querySelector('div[data-ad-rendering-role="profile_name"]');
@@ -96,7 +99,7 @@ async function assess_credibility_of_posts(){
         //getting the menu button on the post (the three dots button)
         let menuButton = post.querySelector('div[aria-haspopup="menu"][aria-label="Actions for this post"]');
         
-        //extracting the text and url from those elements
+        //extracting the text, headline and profile name (source) from those elements
         let textContent = textElement ? textElement.innerText.trim() : 'No text';
         let headline = articleHeadline ? articleHeadline.innerText.trim(): "";
         let sourceContent = source ? source.innerText.trim(): "";
@@ -164,7 +167,7 @@ async function assess_credibility_of_posts(){
                             <p>Explanations:<br>${explanations}</p>
                         </div>
                     `;
-
+                    //report credibility assessment made when report button is clicked
                     tooltip.querySelector(".fake-news-report-button").addEventListener("click", () => {
                         report_prediction(headline, textContent, fake_news_prediction, sourceContent);
                         incorrect_reported_assessments += 1;
@@ -184,6 +187,7 @@ async function assess_credibility_of_posts(){
     }
 }
 
+// update dashboard with new changes
 function updateDashboardDetails(num_assessments, num_correct_assessments, num_incorrect_assessments){
     chrome.storage.local.set({
         total_assessments: num_assessments,
@@ -192,6 +196,7 @@ function updateDashboardDetails(num_assessments, num_correct_assessments, num_in
     });
 }
 
+// send details of post whose credibility assessment is incorrect to server for storage in database
 function report_prediction(headline, text, prediction, source){
     const confirm_report = confirm("Are you sure you want to report this prediction?")
     if (confirm_report){

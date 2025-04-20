@@ -22,19 +22,19 @@ client = MongoClient(mongodb_uri)
 db = client["Fake_News_Detection"]
 reports_collection = db["Reports"]
 
-# loading the saved model and vectorizer
+# loading the clickbait detection model
 clickbait_model = joblib.load("backend/clickbait_model300d.pkl")
 
-# loading the saved fake news detection model
+# loading the fake news classification model
 fake_news_model = joblib.load("backend/fake_news_model300d.pkl")
 
-# Load GloVe embeddings into a dictionary
+# loading GloVe embeddings into a dictionary
 def load_glove_embeddings(glove_file):
     embeddings_index = {}
     with open(glove_file, 'r', encoding='utf-8') as f:
         for line in f:
             values = line.split()
-            word = values[0]  # First word is the key
+            word = values[0]  # first word is the key
             vector = np.asarray(values[1:], dtype='float32')  # The rest are the embedding values
             embeddings_index[word] = vector
     return embeddings_index
@@ -43,26 +43,31 @@ def load_glove_embeddings(glove_file):
 glove_path = "backend/glove.6B.300d.txt" 
 word_to_vec_map = load_glove_embeddings(glove_path)
 
+
 def sentence_to_glove_vector(sentence, word_to_vec_map):
+    # splitting up the sentence into words
     words = sentence.split()
+    # looking up each word' glove vector in the word_to_vec_map dictionary
     word_vectors = [word_to_vec_map[word] for word in words if word in word_to_vec_map]
     
+    # averaging all word vectors to get one final vector for the sentence
     if len(word_vectors) == 0:
         return np.zeros((300,))  # If no words are found, return a zero vector
     
     return np.mean(word_vectors, axis=0)  # Average word vectors
 
-# Function to clean headlines (same as before)
+# function to clean headlines
 def preprocess_text(text):
-    text = text.lower()  # Lowercase
-    text = re.sub(f"[{string.punctuation}]", "", text)  # Remove punctuation
-    text = re.sub(r'\s+', ' ', text).strip()  # Remove extra spaces
+    text = text.lower()  # converting to lowercase
+    text = re.sub(f"[{string.punctuation}]", "", text)  # removing punctuation
+    text = re.sub(r'\s+', ' ', text).strip()  # removing extra spaces
     return text
 
 
 #setting up api key
 client = openai.OpenAI(api_key=gpt_api_key)
 
+# making the gpt model analyse the language used in the text and return a json response
 def analyse_language(text, retries = 2):
     try:
         response = client.chat.completions.create(
@@ -95,7 +100,7 @@ def analyse_language(text, retries = 2):
             return{"label": "Error", "explanations":["Unexpected Issue happened"]}
 
 
-# using perplexity api to fact check
+# using perplexity api to cross-verify text/claim online
 clientPerplexity = openai.OpenAI(api_key=perplexity_api_key, base_url="https://api.perplexity.ai")
 def cross_verify_with_perplexity(text):
     try:
@@ -151,7 +156,7 @@ def report():
         "prediction_made": data["prediction"],
         "actual_prediction":data["actual_prediction"],
     }
-
+    # add report document to reports collection
     reports_collection.insert_one(report_details)
     return jsonify({"message": "Report successful!"}), 201
 
@@ -188,14 +193,15 @@ def detect_clickbait():
         data = request.get_json()
         headline = data.get("headline", "")
 
-        # Preprocess headline
+        # preprocess the headline
         cleaned_headline = preprocess_text(headline)
     
         glove_vector = sentence_to_glove_vector(cleaned_headline, word_to_vec_map)
 
-        # Predict clickbait
+        # predict whether it's clickbait or not
         prediction = clickbait_model.predict([glove_vector])[0]
 
+        #return True or False depending on prediction made (1 or 0)
         return jsonify({"clickbait": bool(prediction)})
 
     except Exception as e:
@@ -209,7 +215,7 @@ def detect_fake_news():
         headline = data.get("headline", "")
         text = data.get("text", "")
 
-        #fact check first
+        # cross verify online with perplexity
         cross_verification = cross_verify_with_perplexity(text)
         print(cross_verification)
 
@@ -225,10 +231,12 @@ def detect_fake_news():
             cleaned_headline = preprocess_text(headline)
             cleaned_text = preprocess_text(text)
 
+            # joining headline and text to use as one feature
             combined_text = cleaned_headline + ' ' + cleaned_text;
 
+            #converting the combined text to a glove vector
             glove_vector = sentence_to_glove_vector(combined_text, word_to_vec_map)
-
+            
             prediction = fake_news_model.predict([glove_vector])[0]
 
             print(prediction)
